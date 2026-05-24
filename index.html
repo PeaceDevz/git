@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Waifu Gallery</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;700&family=Noto+Serif+JP:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --pk:#ff6eb4;--pu:#a855f7;--bl:#60a5fa;
+  --bg:#0d0d1a;--gl:rgba(255,255,255,.08);
+  --bd:rgba(255,255,255,.14);--tx:#f0e6ff;--mu:rgba(240,230,255,.5);
+  --r:20px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--tx);
+  font-family:'Zen Kaku Gothic New',sans-serif;overflow:hidden;user-select:none}
+
+.orbs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.3;animation:orbF 9s ease-in-out infinite alternate}
+.o1{width:350px;height:350px;background:var(--pk);top:-100px;left:-80px}
+.o2{width:280px;height:280px;background:var(--pu);bottom:5%;right:-70px;animation-delay:3s}
+.o3{width:220px;height:220px;background:var(--bl);top:45%;left:25%;animation-delay:6s}
+@keyframes orbF{0%{transform:translate(0,0)scale(1)}100%{transform:translate(25px,-35px)scale(1.12)}}
+
+/* ── API KEY SCREEN ── */
+#keyscreen{
+  position:fixed;inset:0;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:28px 20px;
+  background:rgba(13,13,26,.92);
+  backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  animation:pgIn .35s cubic-bezier(.4,0,.2,1);
+}
+#keyscreen.hide{animation:pgOut .3s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes pgIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+@keyframes pgOut{from{opacity:1;transform:none}to{opacity:0;transform:scale(.96)}}
+
+.ks-logo{font-family:'Noto Serif JP',serif;font-size:2rem;font-weight:300;
+  background:linear-gradient(135deg,var(--pk),var(--pu));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  text-align:center;margin-bottom:4px}
+.ks-sub{font-size:.72rem;color:var(--mu);letter-spacing:.2em;text-align:center;margin-bottom:32px}
+
+.ks-card{
+  width:100%;max-width:360px;
+  background:var(--gl);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border:1px solid var(--bd);border-radius:24px;
+  padding:24px 22px;
+  box-shadow:0 16px 48px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.1);
+}
+.ks-label{font-size:.72rem;color:var(--mu);letter-spacing:.12em;margin-bottom:8px;display:block}
+.ks-inp{
+  width:100%;padding:13px 16px;border-radius:14px;
+  background:rgba(255,255,255,.06);
+  border:1px solid var(--bd);
+  color:var(--tx);font-family:'Zen Kaku Gothic New',sans-serif;font-size:.9rem;
+  outline:none;transition:border-color .2s,box-shadow .2s;
+  letter-spacing:.04em;
+  user-select:text;-webkit-user-select:text;
+}
+.ks-inp:focus{border-color:rgba(255,110,180,.5);box-shadow:0 0 0 3px rgba(255,110,180,.12)}
+.ks-inp::placeholder{color:rgba(240,230,255,.25);font-size:.82rem}
+
+.ks-hint{font-size:.68rem;color:var(--mu);margin-top:8px;line-height:1.6}
+.ks-hint a{color:var(--pk);text-decoration:none;-webkit-text-fill-color:var(--pk)}
+
+.ks-btn{
+  width:100%;margin-top:18px;padding:15px;border-radius:14px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--pk),var(--pu));
+  color:#fff;font-family:'Zen Kaku Gothic New',sans-serif;
+  font-size:.95rem;font-weight:700;letter-spacing:.06em;
+  box-shadow:0 4px 24px rgba(255,110,180,.4),inset 0 1px 0 rgba(255,255,255,.2);
+  transition:all .18s;
+}
+.ks-btn:active{transform:scale(.96)}
+.ks-btn.busy{opacity:.5;pointer-events:none}
+
+.ks-skip{
+  margin-top:14px;width:100%;padding:12px;border-radius:14px;border:1px solid var(--bd);
+  background:transparent;color:var(--mu);font-family:'Zen Kaku Gothic New',sans-serif;
+  font-size:.82rem;cursor:pointer;transition:all .18s;
+}
+.ks-skip:active{background:var(--gl);color:var(--tx)}
+
+.ks-err{font-size:.72rem;color:#ff8080;margin-top:10px;text-align:center;display:none}
+.ks-err.show{display:block}
+
+/* ── MAIN APP ── */
+#app{position:fixed;inset:0;display:flex;flex-direction:column;z-index:1;
+  opacity:0;pointer-events:none;transition:opacity .4s}
+#app.ready{opacity:1;pointer-events:auto}
+
+header{
+  padding:14px 20px 10px;
+  padding-top:max(14px,env(safe-area-inset-top,14px));
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+  border-bottom:1px solid var(--bd);
+  background:rgba(13,13,26,.7);
+  backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+}
+.logo{font-family:'Noto Serif JP',serif;font-size:1.2rem;
+  background:linear-gradient(135deg,var(--pk),var(--pu));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo span{font-size:.62rem;display:block;color:var(--mu);
+  -webkit-text-fill-color:var(--mu);letter-spacing:.18em;margin-top:1px}
+
+.hdr-right{display:flex;align-items:center;gap:10px}
+.key-btn{
+  padding:5px 12px;border-radius:20px;border:1px solid var(--bd);
+  background:var(--gl);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  color:var(--mu);font-size:.68rem;cursor:pointer;transition:all .18s;
+  font-family:'Zen Kaku Gothic New',sans-serif;letter-spacing:.06em;
+}
+.key-btn:active{color:var(--pk);border-color:rgba(255,110,180,.4)}
+
+.nsfw-row{display:flex;align-items:center;gap:7px}
+.nsfw-lbl{font-size:.66rem;color:var(--mu);letter-spacing:.1em}
+.tgl{position:relative;width:44px;height:26px;cursor:pointer}
+.tgl input{opacity:0;width:0;height:0}
+.sl{position:absolute;inset:0;border-radius:13px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);transition:background .3s}
+.sl::before{content:'';position:absolute;width:20px;height:20px;border-radius:50%;
+  left:3px;top:3px;background:rgba(255,255,255,.75);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.tgl input:checked+.sl{background:linear-gradient(135deg,#ff3355,#a855f7)}
+.tgl input:checked+.sl::before{transform:translateX(18px);background:#fff}
+
+.nav{padding:10px 16px;flex-shrink:0;overflow-x:auto;display:flex;gap:8px;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nb{flex-shrink:0;padding:7px 16px;border-radius:50px;
+  border:1px solid var(--bd);background:var(--gl);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  color:var(--mu);font-family:'Zen Kaku Gothic New',sans-serif;
+  font-size:.77rem;cursor:pointer;transition:all .22s cubic-bezier(.4,0,.2,1);white-space:nowrap}
+.nb.active{background:linear-gradient(135deg,rgba(255,110,180,.28),rgba(168,85,247,.28));
+  border-color:rgba(255,110,180,.5);color:var(--tx);
+  box-shadow:0 0 18px rgba(255,110,180,.18)}
+.nb:active{transform:scale(.94)}
+
+main{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 14px 130px;-webkit-overflow-scrolling:touch}
+main::-webkit-scrollbar{display:none}
+.page{display:none}
+.page.active{display:flex;flex-direction:column;animation:pgIn .28s cubic-bezier(.4,0,.2,1)}
+@keyframes pgIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.cw{display:flex;flex-direction:column;gap:16px;padding-top:12px}
+.wcard{border-radius:var(--r);overflow:hidden;background:var(--gl);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border:1px solid var(--bd);
+  box-shadow:0 8px 32px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);
+  animation:cIn .38s cubic-bezier(.4,0,.2,1) both;transition:transform .18s}
+.wcard:active{transform:scale(.975)}
+@keyframes cIn{from{opacity:0;transform:translateY(22px)scale(.96)}to{opacity:1;transform:none}}
+
+.iw{position:relative;width:100%;min-height:260px;background:rgba(0,0,0,.35);
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.wi{width:100%;display:block;object-fit:cover;transition:transform .4s ease}
+.wcard:active .wi{transform:scale(1.025)}
+.sk{position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(255,255,255,.03)25%,rgba(255,255,255,.09)50%,rgba(255,255,255,.03)75%);
+  background-size:200% 100%;animation:shim 1.3s infinite}
+@keyframes shim{from{background-position:-200% 0}to{background-position:200% 0}}
+
+.nbadge{position:absolute;top:10px;right:10px;
+  background:linear-gradient(135deg,rgba(255,30,60,.85),rgba(168,85,247,.85));
+  padding:3px 10px;border-radius:20px;font-size:.62rem;font-weight:700;
+  letter-spacing:.1em;border:1px solid rgba(255,255,255,.2);display:none}
+.is-nsfw .nbadge{display:block}
+.nsfw-blur .wi{filter:blur(30px)}
+
+.cf{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
+  border-top:1px solid rgba(255,255,255,.06)}
+.ctag{font-size:.7rem;color:var(--mu);display:flex;align-items:center;gap:6px;letter-spacing:.08em}
+.cdot{width:6px;height:6px;border-radius:50%;background:linear-gradient(135deg,var(--pk),var(--pu));flex-shrink:0}
+.cacts{display:flex;gap:8px}
+.ib{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.07);
+  border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--mu);transition:all .18s;font-size:15px}
+.ib:active{transform:scale(.75)}
+.ib.sv{color:var(--pk);background:rgba(255,110,180,.15);border-color:rgba(255,110,180,.3)}
+
+.fab{position:fixed;bottom:0;left:0;right:0;
+  padding:14px 18px;padding-bottom:max(20px,calc(env(safe-area-inset-bottom,0px)+14px));
+  display:flex;gap:10px;align-items:center;
+  background:linear-gradient(to top,rgba(13,13,26,.96)65%,transparent);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:10}
+.bg{flex:1;padding:16px;border-radius:16px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--pk),var(--pu));color:#fff;
+  font-family:'Zen Kaku Gothic New',sans-serif;font-size:1rem;font-weight:700;
+  letter-spacing:.05em;
+  box-shadow:0 4px 28px rgba(255,110,180,.45),inset 0 1px 0 rgba(255,255,255,.22);
+  transition:all .18s;position:relative;overflow:hidden}
+.bg::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12),transparent)}
+.bg:active{transform:scale(.95)}
+.bg.busy{opacity:.55;pointer-events:none}
+.bi{display:flex;align-items:center;justify-content:center;gap:8px}
+.br{width:52px;height:52px;border-radius:14px;background:var(--gl);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid var(--bd);color:var(--mu);font-size:1.3rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:all .22s;
+  box-shadow:0 4px 16px rgba(0,0,0,.35);flex-shrink:0}
+.br:active{transform:scale(.85)rotate(35deg)}
+.sp{animation:sp .7s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;bottom:112px;left:50%;transform:translateX(-50%)translateY(18px);
+  background:rgba(18,8,30,.93);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  border:1px solid rgba(255,255,255,.14);padding:10px 22px;border-radius:50px;
+  font-size:.8rem;color:var(--tx);opacity:0;transition:all .28s;
+  pointer-events:none;z-index:999;white-space:nowrap;max-width:88vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%)translateY(0)}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:320px;gap:14px;opacity:.45;text-align:center;padding:24px}
+.ei{font-size:3.5rem}
+.empty p{font-size:.84rem;color:var(--mu);line-height:1.85}
+
+#saved-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 0}
+.st{border-radius:14px;overflow:hidden;aspect-ratio:3/4;background:rgba(0,0,0,.3);
+  border:1px solid var(--bd);position:relative;cursor:pointer;animation:cIn .28s both}
+.st img{width:100%;height:100%;object-fit:cover}
+.dl{position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:50%;
+  background:rgba(0,0,0,.68);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;
+  font-size:10px;color:#fff;cursor:pointer;transition:transform .18s}
+.dl:active{transform:scale(.75)}
+
+.cbg{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;
+  border-radius:9px;background:linear-gradient(135deg,var(--pk),var(--pu));
+  font-size:.6rem;font-weight:700;padding:0 5px;color:#fff;margin-left:4px;transition:transform .18s}
+
+/* no-key banner */
+.nokey-banner{
+  margin:12px 0 0;padding:12px 16px;border-radius:14px;
+  background:rgba(255,170,50,.08);border:1px solid rgba(255,170,50,.2);
+  font-size:.75rem;color:rgba(255,200,100,.8);line-height:1.6;text-align:center;
+}
+</style>
+</head>
+<body>
+<div class="orbs"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+
+<!-- ── API KEY SCREEN ── -->
+<div id="keyscreen">
+  <div class="ks-logo">和風</div>
+  <div class="ks-sub">WAIFU GALLERY</div>
+  <div class="ks-card">
+    <span class="ks-label">🔑 WAIFU.IM API KEY</span>
+    <input class="ks-inp" id="ks-inp" type="password"
+      placeholder="Masukkan API key kamu..."
+      autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <div class="ks-hint">
+      Dapatkan API key gratis di
+      <a href="https://www.waifu.im/dashboard/" target="_blank">waifu.im/dashboard</a>
+      — login lalu copy token kamu.
+    </div>
+    <div class="ks-err" id="ks-err">❌ API key tidak valid, coba lagi.</div>
+    <button class="ks-btn" id="ks-btn">Masuk →</button>
+    <button class="ks-skip" id="ks-skip">Lanjut tanpa API key (rate-limited)</button>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app">
+  <header>
+    <div class="logo">和風<span>WAIFU GALLERY</span></div>
+    <div class="hdr-right">
+      <button class="key-btn" id="change-key-btn">🔑 Key</button>
+      <div class="nsfw-row">
+        <span class="nsfw-lbl">NSFW</span>
+        <label class="tgl"><input type="checkbox" id="ntog"><span class="sl"></span></label>
+      </div>
+    </div>
+  </header>
+
+  <div class="nav">
+    <button class="nb active" data-pg="gen" data-tag="">✦ All</button>
+    <button class="nb" data-pg="gen" data-tag="waifu">Waifu</button>
+    <button class="nb" data-pg="gen" data-tag="maid">Maid</button>
+    <button class="nb" data-pg="gen" data-tag="uniform">Uniform</button>
+    <button class="nb" data-pg="gen" data-tag="oppai">Oppai</button>
+    <button class="nb" data-pg="gen" data-tag="selfie">Selfie</button>
+    <button class="nb" data-pg="gen" data-tag="raiden-shogun">Raiden</button>
+    <button class="nb" data-pg="gen" data-tag="mori-calliope">Calliope</button>
+    <button class="nb" data-pg="gen" data-tag="elf">Elf</button>
+    <button class="nb" data-pg="gen" data-tag="glasses">Glasses</button>
+    <button class="nb" data-pg="saved" data-tag="">♡ Saved</button>
+  </div>
+
+  <main id="pg-gen" class="page active">
+    <div class="cw" id="cw">
+      <div class="empty"><div class="ei">🌸</div><p>Tekan <strong>Generate</strong><br>untuk memuat waifu!</p></div>
+    </div>
+  </main>
+
+  <main id="pg-saved" class="page">
+    <div id="saved-grid"></div>
+  </main>
+</div>
+
+<div class="fab" id="fab">
+  <button class="br" id="br">🎲</button>
+  <button class="bg" id="bgbtn">
+    <span class="bi"><span id="gico">✦</span><span id="gtxt">Generate Waifu</span></span>
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── waifu.im API ─────────────────────────────────────────────
+// Docs: https://docs.waifu.im
+// GET https://api.waifu.im/search
+//   ?included_tags=waifu
+//   &is_nsfw=false
+//   Authorization: Bearer <token>   (opsional tapi recommended)
+
+const API = 'https://api.waifu.im/search';
+// waifu.im v1 — endpoint benar, no /v1/ prefix needed
+const ALL_TAGS_SFW  = ['waifu','maid','uniform','oppai','selfie','elf','glasses','raiden-shogun','mori-calliope'];
+const ALL_TAGS_NSFW = ['ero','ecchi','hentai','oppai','selfie','uniform'];
+
+// ── STATE ─────────────────────────────────────────────────────
+const S = {
+  key: localStorage.getItem('wim-key') || '',
+  tag: '',
+  pg: 'gen',
+  nsfw: false,
+  loading: false,
+  saved: (() => { try{return JSON.parse(localStorage.getItem('wim-saved')||'[]')}catch(e){return[]} })()
+};
+
+// ── DOM ───────────────────────────────────────────────────────
+const keyscreen   = document.getElementById('keyscreen');
+const appEl       = document.getElementById('app');
+const ksInp       = document.getElementById('ks-inp');
+const ksBtn       = document.getElementById('ks-btn');
+const ksSkip      = document.getElementById('ks-skip');
+const ksErr       = document.getElementById('ks-err');
+const changeKeyBtn= document.getElementById('change-key-btn');
+const cw          = document.getElementById('cw');
+const sgrid       = document.getElementById('saved-grid');
+const bgbtn       = document.getElementById('bgbtn');
+const brBtn       = document.getElementById('br');
+const ntog        = document.getElementById('ntog');
+const toastEl     = document.getElementById('toast');
+const fab         = document.getElementById('fab');
+const pgGen       = document.getElementById('pg-gen');
+const pgSaved     = document.getElementById('pg-saved');
+const nbs         = document.querySelectorAll('.nb');
+const gico        = document.getElementById('gico');
+const gtxt        = document.getElementById('gtxt');
+
+// ── TOAST ─────────────────────────────────────────────────────
+let tt;
+function toast(m){
+  clearTimeout(tt);
+  toastEl.textContent=m; toastEl.classList.add('on');
+  tt=setTimeout(()=>toastEl.classList.remove('on'),2400);
+}
+
+// ── KEY SCREEN ────────────────────────────────────────────────
+function openApp(){
+  keyscreen.classList.add('hide');
+  setTimeout(()=>{ keyscreen.style.display='none'; appEl.classList.add('ready'); },300);
+}
+
+function showKeyScreen(){
+  keyscreen.style.display='flex';
+  appEl.classList.remove('ready');
+  setTimeout(()=>keyscreen.classList.remove('hide'),10);
+  ksInp.value = S.key;
+  ksErr.classList.remove('show');
+}
+
+// Auto-open kalau sudah ada key tersimpan
+if(S.key){ openApp(); } else { /* tampilkan key screen */ }
+
+ksSkip.addEventListener('click', () => {
+  S.key = '';
+  openApp();
+  // Tampilkan banner no-key
+  const ex = cw.querySelector('.nokey-banner');
+  if(!ex){
+    const b = document.createElement('div');
+    b.className='nokey-banner';
+    b.innerHTML='⚠️ Mode tanpa API key — request mungkin rate-limited.<br>Tekan 🔑 Key di header untuk memasukkan token.';
+    cw.insertBefore(b, cw.firstChild);
+  }
+});
+
+ksBtn.addEventListener('click', () => {
+  const val = ksInp.value.trim();
+  if(!val){ ksErr.textContent='❌ API key tidak boleh kosong.'; ksErr.classList.add('show'); return; }
+  // Simpan langsung, validasi akan ketahuan saat generate
+  S.key = val;
+  localStorage.setItem('wim-key', val);
+  openApp();
+  toast('🔑 API key tersimpan!');
+  setTimeout(generate, 400);
+});
+
+ksInp.addEventListener('keydown', e=>{ if(e.key==='Enter') ksBtn.click(); });
+changeKeyBtn.addEventListener('click', showKeyScreen);
+
+// ── NAV ───────────────────────────────────────────────────────
+nbs.forEach(b=>{
+  b.addEventListener('click',()=>{
+    nbs.forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    S.pg=b.dataset.pg;
+    if(b.dataset.pg==='gen'){
+      if(b.dataset.tag!==undefined) S.tag=b.dataset.tag;
+      pgGen.classList.add('active'); pgSaved.classList.remove('active');
+      fab.style.display='flex';
+    } else {
+      pgSaved.classList.add('active'); pgGen.classList.remove('active');
+      fab.style.display='none'; renderSaved();
+    }
+  });
+});
+
+// ── NSFW ──────────────────────────────────────────────────────
+ntog.addEventListener('change',()=>{
+  S.nsfw=ntog.checked;
+  document.querySelectorAll('.wcard.is-nsfw').forEach(c=>c.classList.toggle('nsfw-blur',!S.nsfw));
+  toast(S.nsfw?'🔞 NSFW Aktif':'✅ Safe Mode');
+});
+
+// ── FETCH ─────────────────────────────────────────────────────
+async function fetchWaifu(){
+  // Pilih tag
+  let tag = S.tag;
+  if(!tag){
+    // random dari pool sesuai mode
+    const pool = S.nsfw ? ALL_TAGS_NSFW : ALL_TAGS_SFW;
+    tag = pool[Math.floor(Math.random()*pool.length)];
+  }
+
+  const params = new URLSearchParams();
+  params.set('included_tags', tag);
+  params.set('is_nsfw', S.nsfw ? 'true' : 'false');
+  params.set('many', 'false');
+
+  const headers = { 'Accept':'application/json' };
+  if(S.key) headers['Authorization'] = 'Bearer '+S.key;
+
+  const ctrl = new AbortController();
+  const tid  = setTimeout(()=>ctrl.abort(), 9000);
+  try {
+    const r = await fetch(`${API}?${params}`, { headers, signal:ctrl.signal });
+    clearTimeout(tid);
+    if(r.status===401){ throw new Error('API key tidak valid — ganti di 🔑 Key'); }
+    if(r.status===429){ throw new Error('Rate limit — tunggu sebentar atau pakai API key'); }
+    if(!r.ok){ throw new Error('HTTP '+r.status); }
+    const j = await r.json();
+    const img = j.images?.[0];
+    if(!img) throw new Error('Tidak ada hasil untuk tag ini');
+    return {
+      imgUrl: img.url,
+      isNsfw: img.is_nsfw,
+      tag: img.tags?.[0]?.name || tag,
+      source: img.source || '',
+    };
+  } catch(e){
+    clearTimeout(tid);
+    throw e;
+  }
+}
+
+// ── CARD ──────────────────────────────────────────────────────
+function mkCard({ imgUrl, isNsfw, tag }){
+  const saved = S.saved.some(s=>s.url===imgUrl);
+  const blurCls = (isNsfw && !S.nsfw) ? 'nsfw-blur' : '';
+  const label = tag.replace(/-/g,' ').replace(/\b\w/g,l=>l.toUpperCase());
+
+  const el=document.createElement('div');
+  el.className=`wcard${isNsfw?' is-nsfw':''} ${blurCls}`;
+  el.innerHTML=`
+    <div class="iw">
+      <div class="sk"></div>
+      <img class="wi" src="${imgUrl}" alt="${label}" loading="lazy">
+      <div class="nbadge">NSFW 🔞</div>
+    </div>
+    <div class="cf">
+      <div class="ctag"><div class="cdot"></div>${label}</div>
+      <div class="cacts">
+        <button class="ib" data-a="open">🔗</button>
+        <button class="ib${saved?' sv':''}" data-a="save">${saved?'♥':'♡'}</button>
+      </div>
+    </div>`;
+
+  const img=el.querySelector('.wi'), sk=el.querySelector('.sk');
+  img.onload =()=>sk.style.display='none';
+  img.onerror=()=>{
+    sk.style.display='none';
+    el.querySelector('.iw').innerHTML='<div style="padding:70px 0;text-align:center;font-size:2.5rem;opacity:.2">🖼️</div>';
+  };
+  el.querySelector('[data-a="open"]').onclick=()=>window.open(imgUrl,'_blank');
+  el.querySelector('[data-a="save"]').onclick=e=>toggleSave(imgUrl,tag,e.currentTarget);
+  return el;
+}
+
+// ── GENERATE ──────────────────────────────────────────────────
+function loadUI(on){
+  S.loading=on; bgbtn.classList.toggle('busy',on);
+  gico.innerHTML=on?'<span class="sp">◌</span>':'✦';
+  gtxt.textContent=on?'Loading...':'Generate Waifu';
+}
+
+async function generate(){
+  if(S.loading) return;
+  loadUI(true);
+  const empty=cw.querySelector('.empty');
+  if(empty) cw.innerHTML='';
+  // Hapus banner jika ada (tapi simpan posisinya)
+  try {
+    const res=await fetchWaifu();
+    const card=mkCard(res);
+    cw.insertBefore(card,cw.firstChild);
+    while(cw.children.length>14) cw.removeChild(cw.lastChild);
+  } catch(e){
+    toast('❌ '+e.message);
+    // Kembalikan empty state kalau kosong
+    if(!cw.children.length){
+      cw.innerHTML='<div class="empty"><div class="ei">⚠️</div><p>'+e.message+'</p></div>';
+    }
+  } finally { loadUI(false); }
+}
+
+bgbtn.addEventListener('click',generate);
+brBtn.addEventListener('click',()=>{
+  const pool=S.nsfw?ALL_TAGS_NSFW:ALL_TAGS_SFW;
+  const pick=pool[Math.floor(Math.random()*pool.length)];
+  S.tag=pick;
+  nbs.forEach(b=>b.classList.toggle('active',b.dataset.tag===pick));
+  toast('🎲 '+pick);
+  generate();
+});
+
+// ── SAVE ──────────────────────────────────────────────────────
+function toggleSave(url,tag,btn){
+  const i=S.saved.findIndex(s=>s.url===url);
+  if(i===-1){ S.saved.unshift({url,tag,ts:Date.now()}); btn.classList.add('sv'); btn.textContent='♥'; toast('♥ Disimpan!'); }
+  else       { S.saved.splice(i,1); btn.classList.remove('sv'); btn.textContent='♡'; toast('Dihapus'); }
+  localStorage.setItem('wim-saved',JSON.stringify(S.saved));
+  badge();
+}
+function badge(){
+  const b=document.querySelector('[data-pg="saved"]');
+  let bEl=b.querySelector('.cbg');
+  if(S.saved.length){
+    if(!bEl){bEl=document.createElement('span');bEl.className='cbg';b.appendChild(bEl);}
+    bEl.textContent=S.saved.length;
+    bEl.style.transform='scale(1.45)';setTimeout(()=>bEl.style.transform='',200);
+  } else bEl?.remove();
+}
+
+// ── SAVED PAGE ────────────────────────────────────────────────
+function renderSaved(){
+  sgrid.innerHTML='';
+  if(!S.saved.length){
+    sgrid.innerHTML='<div class="empty" style="grid-column:1/-1"><div class="ei">🌸</div><p>Belum ada yang disimpan.<br>Tekan ♡ untuk menyimpan!</p></div>';
+    return;
+  }
+  S.saved.forEach(({url,tag},i)=>{
+    const el=document.createElement('div');
+    el.className='st';el.style.animationDelay=`${i*.04}s`;
+    el.innerHTML=`<img src="${url}" alt="${tag}" loading="lazy"><div class="dl">✕</div>`;
+    el.querySelector('.dl').onclick=e=>{
+      e.stopPropagation();
+      S.saved=S.saved.filter(s=>s.url!==url);
+      localStorage.setItem('wim-saved',JSON.stringify(S.saved));
+      badge();renderSaved();toast('Dihapus');
+    };
+    el.querySelector('img').onclick=()=>window.open(url,'_blank');
+    sgrid.appendChild(el);
+  });
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+badge();
+if(S.key) setTimeout(generate,400);
+</script>
+</body>
+</html>
